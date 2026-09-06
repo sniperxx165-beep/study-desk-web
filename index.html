@@ -1,0 +1,1282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1b1f2a">
+<meta name="description" content="Track weekly study hours per course with per-course timers, Pomodoro mode, streaks, and trophies.">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png">
+<title>Study Desk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #1b1f2a;
+    --surface: #242938;
+    --surface-2: #2c3244;
+    --line: #3a4157;
+    --text: #edeff5;
+    --text-muted: #8b90a3;
+    --amber: #f2a65a;
+    --gold: #d4af6a;
+    --danger: #e0654f;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Space Grotesk', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  #app { max-width: 960px; margin: 0 auto; padding: 32px 20px 80px; }
+
+  .course-a { --tag: #f2a65a; }
+  .course-b { --tag: #6fcf97; }
+  .course-c { --tag: #6fa8dc; }
+  .course-d { --tag: #d88fd8; }
+  .course-e { --tag: #e0654f; }
+  .course-f { --tag: #c9b458; }
+  .course-g { --tag: #9c8cf0; }
+
+  header.top {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    gap: 16px; flex-wrap: wrap; margin-bottom: 8px;
+  }
+  header.top h1 {
+    font-size: 28px; font-weight: 700; margin: 0 0 4px;
+    letter-spacing: -0.01em;
+  }
+  header.top p { margin: 0; color: var(--text-muted); font-size: 14px; }
+  .save-status { font-size: 11.5px; color: var(--text-muted); margin-top: 6px; display: block; min-height: 14px; }
+  .save-status.is-error { color: var(--danger); }
+
+  button {
+    font-family: inherit; cursor: pointer; border: none;
+    border-radius: 8px; font-weight: 600; transition: transform .08s ease, background .15s ease;
+  }
+  button:active { transform: scale(0.97); }
+  button:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+
+  .btn-ghost {
+    background: transparent; color: var(--text-muted);
+    border: 1px solid var(--line); padding: 8px 14px; font-size: 13px;
+  }
+  .btn-ghost:hover { color: var(--text); border-color: var(--text-muted); }
+
+  .btn-add {
+    background: var(--surface-2); color: var(--text);
+    border: 1px solid var(--line); padding: 10px 16px; font-size: 14px;
+    white-space: nowrap;
+  }
+  .btn-add:hover { border-color: var(--amber); color: var(--amber); }
+
+  #trophyShelf {
+    display: flex; gap: 10px; flex-wrap: wrap;
+    margin: 20px 0 16px; padding: 14px 16px;
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 10px;
+  }
+  .shelf-empty { color: var(--text-muted); font-size: 13px; }
+  .shelf-item {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 13px; color: var(--gold);
+    background: rgba(212,175,106,0.08);
+    border: 1px solid rgba(212,175,106,0.35);
+    padding: 5px 10px; border-radius: 20px;
+  }
+  .shelf-item .count { color: var(--text-muted); }
+
+  /* Settings / Pomodoro bar */
+  .settings-bar {
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+    margin-bottom: 24px;
+  }
+  .settings-label {
+    font-size: 13px; color: var(--text-muted); display: flex; align-items: center; gap: 10px;
+  }
+  .switch { position: relative; width: 38px; height: 21px; flex-shrink: 0; }
+  .switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+  .switch .slider {
+    position: absolute; inset: 0; cursor: pointer;
+    background: var(--surface-2); border: 1px solid var(--line); border-radius: 22px;
+    transition: background .2s ease, border-color .2s ease;
+  }
+  .switch .slider:before {
+    content: ""; position: absolute; height: 15px; width: 15px; left: 2px; top: 2px;
+    background: var(--text-muted); border-radius: 50%; transition: transform .2s ease, background .2s ease;
+  }
+  .switch input:checked + .slider { background: rgba(242,166,90,0.22); border-color: var(--amber); }
+  .switch input:checked + .slider:before { transform: translateX(17px); background: var(--amber); }
+
+  .settings-toggle-link {
+    font-size: 12px; color: var(--text-muted); background: none; border: none;
+    text-decoration: underline; padding: 0; cursor: pointer;
+  }
+  .settings-toggle-link:hover { color: var(--text); }
+
+  .settings-panel {
+    display: flex; gap: 16px; flex-wrap: wrap;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+    padding: 14px 16px; width: 100%;
+  }
+  .settings-field { display: flex; flex-direction: column; gap: 5px; font-size: 11.5px; color: var(--text-muted); }
+  .settings-field input {
+    width: 78px; background: var(--surface-2); border: 1px solid var(--line);
+    color: var(--text); border-radius: 6px; padding: 7px 9px; font-family: 'Space Mono', monospace; font-size: 13px;
+  }
+
+  #grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+    gap: 16px;
+  }
+
+  .card {
+    position: relative;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--tag, var(--line));
+    border-radius: 10px;
+    padding: 20px;
+    display: flex; flex-direction: column; gap: 14px;
+    transition: border-color .2s ease;
+  }
+  .card.running { border-color: var(--tag); box-shadow: 0 0 0 1px var(--tag) inset; }
+
+  .card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+  .card-title-wrap { min-width: 0; }
+  .card-name {
+    font-size: 16px; font-weight: 700; margin: 0; line-height: 1.25;
+    overflow-wrap: anywhere;
+  }
+  .card-goal { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+  .card-actions-top { display: flex; gap: 4px; flex-shrink: 0; }
+  .icon-btn {
+    background: transparent; border: none; color: var(--text-muted);
+    font-size: 14px; padding: 4px 6px; border-radius: 6px; line-height: 1;
+  }
+  .icon-btn:hover { color: var(--text); background: var(--surface-2); }
+  .icon-btn.is-active { color: var(--gold); background: rgba(212,175,106,0.12); }
+
+  .trophy-count {
+    font-size: 12px; color: var(--gold); display: flex; align-items: center; gap: 4px;
+  }
+
+  .boost-chip {
+    display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--gold);
+    background: rgba(212,175,106,0.1); border: 1px solid rgba(212,175,106,0.35);
+    padding: 3px 8px; border-radius: 20px; width: fit-content;
+  }
+  .boost-chip button {
+    background: none; border: none; color: var(--text-muted); font-size: 13px; cursor: pointer;
+    padding: 0; line-height: 1;
+  }
+  .boost-chip button:hover { color: var(--danger); }
+
+  .streak-chip {
+    display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--amber);
+    background: rgba(242,166,90,0.1); border: 1px solid rgba(242,166,90,0.35);
+    padding: 3px 8px; border-radius: 20px; width: fit-content;
+  }
+
+  .btn-danger {
+    background: transparent; color: var(--danger); border: 1px solid rgba(224,101,79,0.5);
+    padding: 8px 14px; font-size: 13px;
+  }
+  .btn-danger:hover { background: rgba(224,101,79,0.1); border-color: var(--danger); }
+
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(10,12,18,0.72);
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px; z-index: 100;
+  }
+  .modal-panel {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+    max-width: 560px; width: 100%; max-height: 85vh; overflow-y: auto;
+    padding: 26px;
+  }
+  .modal-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 4px; }
+  .modal-head h2 { margin: 0; font-size: 21px; }
+  .modal-close { background: none; border: none; color: var(--text-muted); font-size: 18px; cursor: pointer; line-height: 1; padding: 4px; }
+  .modal-close:hover { color: var(--text); }
+  .modal-sub { color: var(--text-muted); font-size: 13px; margin: 0 0 20px; }
+
+  .modal-total {
+    background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px;
+    padding: 14px 16px; margin-bottom: 18px; display: flex; justify-content: space-between; align-items: center;
+  }
+  .modal-total .num { font-family: 'Space Mono', monospace; font-size: 22px; font-weight: 700; color: var(--amber); }
+  .modal-total .label { font-size: 12px; color: var(--text-muted); }
+
+  .modal-course-row {
+    display: flex; justify-content: space-between; align-items: center; gap: 12px;
+    padding: 12px 0; border-bottom: 1px solid var(--line);
+  }
+  .modal-course-row:last-of-type { border-bottom: none; }
+  .modal-course-name { font-weight: 600; font-size: 14px; }
+  .modal-course-stats { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+  .modal-course-tier { font-size: 18px; flex-shrink: 0; text-align: center; min-width: 44px; }
+
+  .modal-actions { display: flex; gap: 10px; margin-top: 22px; flex-wrap: wrap; }
+  .modal-actions button { flex: 1; padding: 11px; font-size: 13px; min-width: 140px; }
+
+  .modal-danger-zone {
+    margin-top: 22px; padding-top: 18px; border-top: 1px dashed var(--line);
+  }
+  .modal-danger-zone p { font-size: 12px; color: var(--text-muted); margin: 0 0 10px; }
+
+  .timer-display { text-align: center; padding: 4px 0 2px; }
+  .timer-big {
+    font-family: 'Space Mono', monospace;
+    font-size: 34px; font-weight: 700; letter-spacing: 0.5px;
+    color: var(--text);
+  }
+  .card.running .timer-big { color: var(--tag); }
+  .timer-sub {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px; color: var(--text-muted); margin-top: 4px;
+  }
+  .timer-done .timer-big { color: var(--gold); }
+
+  .phase-row {
+    display: flex; align-items: center; justify-content: center; gap: 7px;
+    font-size: 12px; color: var(--text-muted); margin-top: -8px;
+  }
+  .phase-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .phase-dot.focus { background: var(--tag); }
+  .phase-dot.short { background: #6fcf97; }
+  .phase-dot.long { background: #6fa8dc; }
+  .phase-time { font-family: 'Space Mono', monospace; }
+
+  .progress-track {
+    height: 6px; border-radius: 4px; background: var(--surface-2); overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%; background: var(--tag); border-radius: 4px;
+    transition: width .3s ease;
+  }
+
+  .card-actions {
+    display: flex; gap: 8px; margin-top: 2px;
+  }
+  .btn-primary {
+    flex: 1; padding: 10px; font-size: 14px; border-radius: 8px;
+    background: var(--tag); color: #14161d;
+  }
+  .btn-primary.is-running { background: var(--surface-2); color: var(--text); border: 1px solid var(--tag); }
+  .btn-reset {
+    padding: 10px 12px; font-size: 13px; background: transparent;
+    color: var(--text-muted); border: 1px solid var(--line);
+  }
+  .btn-reset:hover { color: var(--danger); border-color: var(--danger); }
+
+  .edit-form { display: flex; flex-direction: column; gap: 8px; }
+  .edit-form input {
+    font-family: inherit; background: var(--surface-2); border: 1px solid var(--line);
+    color: var(--text); border-radius: 6px; padding: 8px 10px; font-size: 14px; width: 100%;
+  }
+  .edit-form .row { display: flex; gap: 8px; }
+  .edit-form .row input:last-child { width: 90px; flex-shrink: 0; }
+  .edit-actions { display: flex; gap: 8px; }
+  .edit-actions button { flex: 1; padding: 8px; font-size: 13px; }
+
+  .test-form {
+    display: flex; flex-direction: column; gap: 8px;
+    background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 12px;
+  }
+  .test-form p.hint { margin: 0; font-size: 11.5px; color: var(--text-muted); }
+  .test-form .row2 { display: flex; gap: 8px; }
+  .test-form input {
+    flex: 1; background: var(--surface); border: 1px solid var(--line); color: var(--text);
+    border-radius: 6px; padding: 7px 9px; font-family: inherit; font-size: 12.5px; min-width: 0;
+  }
+  .test-form .actions { display: flex; gap: 6px; }
+  .test-form .actions button { flex: 1; padding: 8px; font-size: 12.5px; }
+
+  footer.week {
+    margin-top: 32px; display: flex; justify-content: center;
+  }
+
+  /* Onboarding */
+  #onboarding {
+    max-width: 520px; margin: 60px auto; padding: 28px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+  }
+  #onboarding h2 { margin: 0 0 6px; font-size: 22px; }
+  #onboarding p.lead { margin: 0 0 24px; color: var(--text-muted); font-size: 14px; }
+  .ob-row { display: flex; gap: 8px; margin-bottom: 10px; align-items: center; }
+  .ob-row .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .ob-row input[type="text"] {
+    flex: 1; background: var(--surface-2); border: 1px solid var(--line);
+    color: var(--text); border-radius: 6px; padding: 10px 12px; font-size: 14px; font-family: inherit;
+  }
+  .ob-row input[type="number"] {
+    width: 90px; background: var(--surface-2); border: 1px solid var(--line);
+    color: var(--text); border-radius: 6px; padding: 10px 12px; font-size: 14px; font-family: inherit;
+  }
+  .ob-row .unit { font-size: 12px; color: var(--text-muted); }
+  #onboarding .submit {
+    width: 100%; padding: 13px; font-size: 15px; background: var(--amber);
+    color: #14161d; margin-top: 14px;
+  }
+  #onboarding .submit:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px);
+    background: var(--surface-2); border: 1px solid var(--gold); color: var(--text);
+    padding: 12px 20px; border-radius: 10px; font-size: 14px;
+    opacity: 0; transition: opacity .3s ease, transform .3s ease;
+    pointer-events: none; z-index: 50; display: flex; align-items: center; gap: 8px;
+    max-width: 90vw; text-align: left;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  #loading { text-align: center; padding: 60px 0; color: var(--text-muted); }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="loading">Loading your study desk...</div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  const STORAGE_KEY = "study-desk-data";
+  const TAG_CLASSES = ["course-a","course-b","course-c","course-d","course-e","course-f","course-g"];
+  const DEFAULT_SETTINGS = { pomodoro: false, focusMin: 25, shortBreakMin: 5, longBreakMin: 15, cyclesBeforeLong: 4 };
+
+  let data = null; // { courses:[{id,name,goalHours,boost?}], progress:{id:{seconds}}, badges:{id:count}, settings:{...} }
+  let runningId = null;
+  let tickHandle = null;
+  let lastTick = 0;
+  let editingId = null;
+  let testFormOpenId = null;
+  let settingsPanelOpen = false;
+  let saveTimeout = null;
+  let pomodoroState = { courseId: null, phase: null, remaining: 0, cycles: 0 };
+  let saveStatus = "idle"; // idle | error
+  let semesterModalOpen = false;
+  const SYNC_CONFIG_KEY = "study-desk-sync-config";
+  let syncPanelOpen = false;
+  let syncState = "idle"; // idle | syncing | error | synced
+  let syncMessage = "";
+  let syncDirty = false;
+  let lastAutoPushAt = 0;
+
+  function getSyncConfig(){
+    try {
+      const raw = localStorage.getItem(SYNC_CONFIG_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch(e){}
+    return { serverUrl: "", code: "" };
+  }
+
+  function setSyncConfig(cfg){
+    localStorage.setItem(SYNC_CONFIG_KEY, JSON.stringify(cfg));
+  }
+
+  function genSyncCode(){
+    const words = ["orbit","comet","maple","ember","tidal","vivid","quartz","lumen","cedar","pixel"];
+    const pick = function(){ return words[Math.floor(Math.random()*words.length)]; };
+    return pick() + "-" + pick() + "-" + Math.floor(1000 + Math.random()*9000);
+  }
+
+  async function pushSync(silent){
+    const cfg = getSyncConfig();
+    if (!cfg.serverUrl || !cfg.code){
+      if (!silent){ syncState = "error"; syncMessage = "Set a server URL and code first."; render(); }
+      return;
+    }
+    if (!silent){ syncState = "syncing"; syncMessage = "Pushing..."; render(); }
+    try {
+      data.updatedAt = Date.now();
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      const res = await fetch(cfg.serverUrl.replace(/\/$/,"") + "/api/sync/" + encodeURIComponent(cfg.code), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data: data, updatedAt: data.updatedAt })
+      });
+      if (!res.ok) throw new Error("Server responded " + res.status);
+      syncDirty = false;
+      syncState = "synced"; syncMessage = silent ? "Auto-synced just now." : "Pushed just now.";
+    } catch(e){
+      console.warn("Sync push failed", e);
+      if (!silent){ syncState = "error"; syncMessage = "Couldn't reach the sync server."; }
+    }
+    if (!silent) render();
+  }
+
+  async function pullSync(silent){
+    const cfg = getSyncConfig();
+    if (!cfg.serverUrl || !cfg.code){
+      if (!silent){ syncState = "error"; syncMessage = "Set a server URL and code first."; render(); }
+      return;
+    }
+    if (!silent){ syncState = "syncing"; syncMessage = "Pulling..."; render(); }
+    try {
+      const res = await fetch(cfg.serverUrl.replace(/\/$/,"") + "/api/sync/" + encodeURIComponent(cfg.code));
+      if (res.status === 404){
+        if (!silent){ syncState = "error"; syncMessage = "No data saved under that code yet. Try Push first."; render(); }
+        return;
+      }
+      if (!res.ok) throw new Error("Server responded " + res.status);
+      const remote = await res.json();
+      const localUpdatedAt = data.updatedAt || 0;
+      if (remote && remote.updatedAt && remote.updatedAt > localUpdatedAt){
+        data = remote.data;
+        data.updatedAt = remote.updatedAt;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        syncDirty = false;
+        syncState = "synced"; syncMessage = "Pulled newer data from another device.";
+      } else if (!silent){
+        syncState = "synced"; syncMessage = "Already up to date.";
+      }
+    } catch(e){
+      console.warn("Sync pull failed", e);
+      if (!silent){ syncState = "error"; syncMessage = "Couldn't reach the sync server."; }
+    }
+    render();
+  }
+
+  const appEl = document.getElementById("app");
+  const toastEl = document.getElementById("toast");
+
+  function showToast(msg){
+    toastEl.textContent = msg;
+    toastEl.classList.add("show");
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(function(){ toastEl.classList.remove("show"); }, 3400);
+  }
+
+  function uid(){ return Math.random().toString(36).slice(2,10) + Date.now().toString(36); }
+
+  async function loadData(){
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch(e) { console.warn("Load failed", e); }
+    return { courses: [], progress: {}, badges: {}, settings: Object.assign({}, DEFAULT_SETTINGS), streaks: {}, bestStreaks: {}, totalSeconds: {} };
+  }
+
+  function scheduleSave(){
+    clearTimeout(saveTimeout);
+    saveTimeout = setTimeout(saveData, 400);
+  }
+
+  function setSaveStatus(next){
+    if (saveStatus === next) return;
+    saveStatus = next;
+    const el = document.getElementById("saveStatus");
+    if (!el) return;
+    if (next === "error"){ el.textContent = "Couldn't save \u2014 your browser storage may be full or blocked."; el.className = "save-status is-error"; }
+    else { el.textContent = ""; el.className = "save-status"; }
+  }
+
+  function saveData(){
+    try {
+      data.updatedAt = Date.now();
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      setSaveStatus("idle");
+      syncDirty = true;
+    } catch(e) {
+      console.warn("Save failed", e);
+      setSaveStatus("error");
+    }
+  }
+
+  function formatHMS(totalSeconds){
+    const s = Math.max(0, Math.round(totalSeconds));
+    const h = Math.floor(s/3600);
+    const m = Math.floor((s%3600)/60);
+    const sec = s%60;
+    return String(h).padStart(2,"0")+":"+String(m).padStart(2,"0")+":"+String(sec).padStart(2,"0");
+  }
+
+  function formatMMSS(totalSeconds){
+    const s = Math.max(0, Math.round(totalSeconds));
+    const m = Math.floor(s/60);
+    const sec = s%60;
+    return String(m).padStart(2,"0")+":"+String(sec).padStart(2,"0");
+  }
+
+  function formatHM(totalSeconds){
+    const s = Math.max(0, Math.round(totalSeconds));
+    const h = Math.floor(s/3600);
+    const m = Math.floor((s%3600)/60);
+    if (h === 0) return m + "m";
+    return h + "h " + m + "m";
+  }
+
+  function todayStr(){
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth()+1).padStart(2,"0");
+    const day = String(d.getDate()).padStart(2,"0");
+    return y+"-"+m+"-"+day;
+  }
+
+  function defaultBoostDate(){
+    const d = new Date();
+    d.setDate(d.getDate()+7);
+    const y = d.getFullYear();
+    const m = String(d.getMonth()+1).padStart(2,"0");
+    const day = String(d.getDate()).padStart(2,"0");
+    return y+"-"+m+"-"+day;
+  }
+
+  function formatDateShort(dateStr){
+    const d = new Date(dateStr+"T00:00:00");
+    return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  }
+
+  function hasActiveBoost(c){
+    return !!(c.boost && c.boost.until >= todayStr());
+  }
+
+  function effectiveGoalHours(c){
+    return c.goalHours + (hasActiveBoost(c) ? c.boost.extraHours : 0);
+  }
+
+  function expireBoosts(){
+    const expired = [];
+    data.courses.forEach(function(c){
+      if (c.boost && c.boost.until < todayStr()){
+        expired.push(c.name);
+        delete c.boost;
+      }
+    });
+    if (expired.length){
+      scheduleSave();
+      showToast("Test boost ended for " + expired.join(", ") + ".");
+    }
+  }
+
+  function goalSeconds(c){ return effectiveGoalHours(c) * 3600; }
+
+  function getTier(count){
+    if (!count || count < 1) return null;
+    if (count <= 2) return { emoji: "\u{1F949}", label: "Bronze" };
+    if (count <= 5) return { emoji: "\u{1F948}", label: "Silver" };
+    return { emoji: "\u{1F947}", label: "Gold" };
+  }
+
+  function render(){
+    if (!data.courses.length){
+      renderOnboarding();
+      return;
+    }
+
+    const trophyHtml = data.courses.map(function(c){
+      const count = data.badges[c.id] || 0;
+      if (!count) return "";
+      const tier = getTier(count);
+      const streak = data.streaks[c.id] || 0;
+      return '<span class="shelf-item">' + tier.emoji + ' ' + escapeHtml(c.name) + ' <span class="count">\u00d7' + count + '</span>' + (streak >= 1 ? ' \u{1F525}' + streak : '') + '</span>';
+    }).filter(Boolean).join("");
+
+    const cardsHtml = data.courses.map(function(c, i){ return renderCard(c, i); }).join("");
+
+    const s = data.settings;
+    const settingsPanelHtml = settingsPanelOpen ? (
+      '<div class="settings-panel">' +
+        '<label class="settings-field">Focus (min)<input type="number" id="focusMinInput" value="' + s.focusMin + '" min="1" max="180"></label>' +
+        '<label class="settings-field">Short break (min)<input type="number" id="shortBreakInput" value="' + s.shortBreakMin + '" min="1" max="60"></label>' +
+        '<label class="settings-field">Long break (min)<input type="number" id="longBreakInput" value="' + s.longBreakMin + '" min="1" max="90"></label>' +
+        '<label class="settings-field">Cycles before long break<input type="number" id="cyclesInput" value="' + s.cyclesBeforeLong + '" min="1" max="12"></label>' +
+      '</div>'
+    ) : "";
+
+    const syncCfg = getSyncConfig();
+    const syncPanelHtml = syncPanelOpen ? (
+      '<div class="settings-panel">' +
+        '<label class="settings-field">Sync server URL<input type="text" id="syncUrlInput" placeholder="https://your-server.example.com" value="' + escapeHtml(syncCfg.serverUrl || "") + '"></label>' +
+        '<label class="settings-field">Sync code<input type="text" id="syncCodeInput" placeholder="e.g. maple-comet-4821" value="' + escapeHtml(syncCfg.code || "") + '"></label>' +
+        '<div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;">' +
+          '<button class="btn-ghost" id="syncGenCodeBtn" type="button">Generate code</button>' +
+          '<button class="btn-ghost" id="syncPushBtn" type="button">Push this device\u2019s data</button>' +
+          '<button class="btn-ghost" id="syncPullBtn" type="button">Pull latest</button>' +
+        '</div>' +
+        '<p style="font-size:12px;opacity:0.75;margin-top:6px;">' +
+          (syncState === "syncing" ? syncMessage : (syncMessage || "Enter the same server URL and code on every device to keep them in sync.")) +
+          ' Auto-syncs every couple minutes while open.' +
+        '</p>' +
+      '</div>'
+    ) : "";
+
+    appEl.innerHTML =
+      '<header class="top">' +
+        '<div>' +
+          '<h1>Study Desk</h1>' +
+          '<p>This semester, one focused hour at a time.</p>' +
+          '<span class="save-status' + (saveStatus === "error" ? " is-error" : "") + '" id="saveStatus">' + (saveStatus === "error" ? "Couldn\'t save \u2014 storage may be full or blocked" : "") + '</span>' +
+        '</div>' +
+        '<button class="btn-add" id="addCourseBtn">+ Add course</button>' +
+      '</header>' +
+      '<div id="trophyShelf">' +
+        (trophyHtml || '<span class="shelf-empty">No trophies yet, finish a course\'s weekly hours to earn one.</span>') +
+      '</div>' +
+      '<div class="settings-bar">' +
+        '<label class="settings-label">' +
+          '<span class="switch"><input type="checkbox" id="pomodoroToggle" ' + (s.pomodoro?"checked":"") + '><span class="slider"></span></span>' +
+          'Pomodoro mode' +
+        '</label>' +
+        '<button class="settings-toggle-link" id="settingsPanelToggle">' + (settingsPanelOpen ? "Hide timing" : "Customize timing") + '</button>' +
+        '<button class="settings-toggle-link" id="syncPanelToggle" style="margin-left:8px;">' + (syncPanelOpen ? "Hide sync" : "Sync across devices") + '</button>' +
+        settingsPanelHtml +
+        syncPanelHtml +
+      '</div>' +
+      '<div id="grid">' + cardsHtml + '</div>' +
+      '<footer class="week">' +
+        '<button class="btn-ghost" id="resetWeekBtn">Start a new week (reset all hours)</button>' +
+        '<button class="btn-ghost" id="endSemesterBtn" style="margin-left:10px;">End semester</button>' +
+      '</footer>' +
+      (semesterModalOpen ? renderSemesterModal() : "");
+
+    document.getElementById("addCourseBtn").addEventListener("click", addCourse);
+    document.getElementById("resetWeekBtn").addEventListener("click", resetAll);
+    document.getElementById("endSemesterBtn").addEventListener("click", function(){
+      semesterModalOpen = true;
+      render();
+    });
+
+    if (semesterModalOpen) wireSemesterModal();
+
+    document.getElementById("pomodoroToggle").addEventListener("change", function(e){
+      if (runningId) stopTicking();
+      data.settings.pomodoro = e.target.checked;
+      pomodoroState = { courseId: null, phase: null, remaining: 0, cycles: 0 };
+      scheduleSave();
+      render();
+    });
+    document.getElementById("settingsPanelToggle").addEventListener("click", function(){
+      settingsPanelOpen = !settingsPanelOpen;
+      render();
+    });
+    document.getElementById("syncPanelToggle").addEventListener("click", function(){
+      syncPanelOpen = !syncPanelOpen;
+      render();
+    });
+    if (syncPanelOpen){
+      document.getElementById("syncUrlInput").addEventListener("change", function(e){
+        const cfg = getSyncConfig();
+        cfg.serverUrl = e.target.value.trim();
+        setSyncConfig(cfg);
+      });
+      document.getElementById("syncCodeInput").addEventListener("change", function(e){
+        const cfg = getSyncConfig();
+        cfg.code = e.target.value.trim();
+        setSyncConfig(cfg);
+      });
+      document.getElementById("syncGenCodeBtn").addEventListener("click", function(){
+        const cfg = getSyncConfig();
+        cfg.code = genSyncCode();
+        setSyncConfig(cfg);
+        render();
+      });
+      document.getElementById("syncPushBtn").addEventListener("click", function(){ pushSync(false); });
+      document.getElementById("syncPullBtn").addEventListener("click", function(){ pullSync(false); });
+    }
+    if (settingsPanelOpen){
+      const bindNum = function(id, key, min, max){
+        document.getElementById(id).addEventListener("change", function(e){
+          let v = parseInt(e.target.value, 10);
+          if (isNaN(v)) v = DEFAULT_SETTINGS[key];
+          v = Math.min(max, Math.max(min, v));
+          data.settings[key] = v;
+          scheduleSave();
+        });
+      };
+      bindNum("focusMinInput", "focusMin", 1, 180);
+      bindNum("shortBreakInput", "shortBreakMin", 1, 60);
+      bindNum("longBreakInput", "longBreakMin", 1, 90);
+      bindNum("cyclesInput", "cyclesBeforeLong", 1, 12);
+    }
+
+    data.courses.forEach(function(c){
+      const card = document.getElementById("card-"+c.id);
+      if (!card) return;
+
+      if (editingId === c.id){
+        wireEditForm(c);
+        return;
+      }
+
+      const toggleBtn = card.querySelector(".js-toggle");
+      if (toggleBtn) toggleBtn.addEventListener("click", function(){ toggleTimer(c.id); });
+      const resetBtn = card.querySelector(".js-reset");
+      if (resetBtn) resetBtn.addEventListener("click", function(){ resetCourse(c.id); });
+      const editBtn = card.querySelector(".js-edit");
+      if (editBtn) editBtn.addEventListener("click", function(){ editingId = c.id; testFormOpenId = null; render(); });
+      const deleteBtn = card.querySelector(".js-delete");
+      if (deleteBtn) deleteBtn.addEventListener("click", function(){ deleteCourse(c.id); });
+      const testBtn = card.querySelector(".js-test");
+      if (testBtn) testBtn.addEventListener("click", function(){
+        testFormOpenId = (testFormOpenId === c.id) ? null : c.id;
+        editingId = null;
+        render();
+      });
+      const boostClear = card.querySelector(".js-boost-clear-chip");
+      if (boostClear) boostClear.addEventListener("click", function(){
+        delete c.boost; scheduleSave(); render();
+      });
+
+      if (testFormOpenId === c.id){
+        const saveBtn = card.querySelector(".js-boost-save");
+        const clearBtn = card.querySelector(".js-boost-clear");
+        const cancelBtn = card.querySelector(".js-boost-cancel");
+        if (saveBtn) saveBtn.addEventListener("click", function(){
+          const form = document.getElementById("testform-"+c.id);
+          const hoursVal = parseFloat(form.querySelector(".js-boost-hours").value);
+          const untilVal = form.querySelector(".js-boost-until").value;
+          if (!hoursVal || hoursVal <= 0 || !untilVal){
+            showToast("Add extra hours and a date to set a test boost.");
+            return;
+          }
+          c.boost = { extraHours: Math.round(hoursVal*2)/2, until: untilVal };
+          testFormOpenId = null;
+          scheduleSave();
+          render();
+          showToast("Test boost set for " + c.name + ".");
+        });
+        if (clearBtn) clearBtn.addEventListener("click", function(){
+          delete c.boost;
+          testFormOpenId = null;
+          scheduleSave();
+          render();
+        });
+        if (cancelBtn) cancelBtn.addEventListener("click", function(){
+          testFormOpenId = null;
+          render();
+        });
+      }
+    });
+  }
+
+  function renderCard(c, i){
+    const tagClass = TAG_CLASSES[i % TAG_CLASSES.length];
+    const seconds = (data.progress[c.id] && data.progress[c.id].seconds) || 0;
+    const goalSecs = goalSeconds(c);
+    const remaining = Math.max(0, goalSecs - seconds);
+    const isRunning = runningId === c.id;
+    const isDone = remaining <= 0 && goalSecs > 0;
+    const pct = goalSecs > 0 ? Math.min(100, (seconds/goalSecs)*100) : 0;
+    const trophyCount = data.badges[c.id] || 0;
+    const streak = data.streaks[c.id] || 0;
+    const tier = getTier(trophyCount);
+    const boosted = hasActiveBoost(c);
+    const showPhase = isRunning && data.settings.pomodoro && pomodoroState.courseId === c.id && pomodoroState.phase;
+
+    if (editingId === c.id){
+      return (
+        '<div class="card ' + tagClass + '" id="card-' + c.id + '">' +
+          '<div class="edit-form" id="editform-' + c.id + '">' +
+            '<input type="text" class="js-name" value="' + escapeAttr(c.name) + '" placeholder="Course name" maxlength="40">' +
+            '<div class="row">' +
+              '<input type="number" class="js-hours" value="' + c.goalHours + '" min="0.5" max="80" step="0.5">' +
+              '<span class="unit" style="align-self:center;">hrs / week goal</span>' +
+            '</div>' +
+            '<div class="edit-actions">' +
+              '<button class="btn-primary js-save" style="--tag:inherit;">Save</button>' +
+              '<button class="btn-reset js-cancel">Cancel</button>' +
+            '</div>' +
+          '</div>' +
+        '</div>'
+      );
+    }
+
+    let testFormHtml = "";
+    if (testFormOpenId === c.id){
+      testFormHtml =
+        '<div class="test-form" id="testform-' + c.id + '">' +
+          '<p class="hint">Got a test coming up? Add extra hours for a limited time.</p>' +
+          '<div class="row2">' +
+            '<input type="number" class="js-boost-hours" placeholder="Extra hrs" min="0.5" step="0.5" value="' + (c.boost ? c.boost.extraHours : "") + '">' +
+            '<input type="date" class="js-boost-until" value="' + (c.boost ? c.boost.until : defaultBoostDate()) + '">' +
+          '</div>' +
+          '<div class="actions">' +
+            '<button class="btn-primary js-boost-save" style="--tag:inherit;">Save</button>' +
+            (c.boost ? '<button class="btn-reset js-boost-clear">Clear</button>' : "") +
+            '<button class="btn-reset js-boost-cancel">Cancel</button>' +
+          '</div>' +
+        '</div>';
+    }
+
+    const boostChipHtml = (boosted && testFormOpenId !== c.id) ?
+      '<div class="boost-chip">\u{1F3AF} +' + c.boost.extraHours + 'h until ' + formatDateShort(c.boost.until) + '<button class="js-boost-clear-chip" title="Clear test boost" aria-label="Clear test boost">\u00d7</button></div>'
+      : "";
+
+    const streakChipHtml = (streak >= 1 && testFormOpenId !== c.id) ?
+      '<div class="streak-chip">\u{1F525} ' + streak + '-week streak</div>'
+      : "";
+
+    let phaseRowHtml = "";
+    if (showPhase){
+      const label = pomodoroState.phase === "focus" ? "Focus" : (pomodoroState.phase === "long" ? "Long break" : "Short break");
+      phaseRowHtml =
+        '<div class="phase-row">' +
+          '<span class="phase-dot ' + pomodoroState.phase + '"></span>' +
+          label + ' \u2014 <span class="phase-time">' + formatMMSS(pomodoroState.remaining) + '</span> left' +
+        '</div>';
+    }
+
+    return (
+      '<div class="card ' + tagClass + (isRunning ? " running" : "") + (isDone ? " timer-done" : "") + '" id="card-' + c.id + '">' +
+        '<div class="card-head">' +
+          '<div class="card-title-wrap">' +
+            '<p class="card-name">' + escapeHtml(c.name) + '</p>' +
+            '<div class="card-goal">' + c.goalHours + 'h goal / week</div>' +
+          '</div>' +
+          '<div class="card-actions-top">' +
+            (tier ? '<span class="trophy-count" title="' + tier.label + ' tier">' + tier.emoji + ' \u00d7' + trophyCount + '</span>' : "") +
+            '<button class="icon-btn js-test' + (testFormOpenId === c.id || boosted ? " is-active" : "") + '" title="Test / exam boost" aria-label="Add test boost">\u{1F3AF}</button>' +
+            '<button class="icon-btn js-edit" title="Edit course" aria-label="Edit course">\u270E</button>' +
+            '<button class="icon-btn js-delete" title="Remove course" aria-label="Remove course">\u2715</button>' +
+          '</div>' +
+        '</div>' +
+
+        boostChipHtml +
+        streakChipHtml +
+        testFormHtml +
+
+        (testFormOpenId === c.id ? "" :
+          '<div class="timer-display">' +
+            '<div class="timer-big">' + (isDone ? "Done!" : formatHMS(remaining)) + '</div>' +
+            '<div class="timer-sub">' + formatHM(seconds) + ' studied of ' + effectiveGoalHours(c) + 'h</div>' +
+          '</div>' +
+          phaseRowHtml +
+          '<div class="progress-track"><div class="progress-fill" style="width:' + pct + '%;"></div></div>' +
+          '<div class="card-actions">' +
+            '<button class="btn-primary js-toggle' + (isRunning ? " is-running" : "") + '"' + (isDone ? " disabled" : "") + '>' +
+              (isRunning ? "Pause" : (isDone ? "Complete" : "Start")) +
+            '</button>' +
+            '<button class="btn-reset js-reset">Reset</button>' +
+          '</div>'
+        ) +
+      '</div>'
+    );
+  }
+
+  function wireEditForm(c){
+    const form = document.getElementById("editform-"+c.id);
+    if (!form) return;
+    form.querySelector(".js-save").addEventListener("click", function(){
+      const nameVal = form.querySelector(".js-name").value.trim();
+      const hoursVal = parseFloat(form.querySelector(".js-hours").value);
+      if (nameVal) c.name = nameVal.slice(0,40);
+      if (!isNaN(hoursVal) && hoursVal > 0) c.goalHours = Math.round(hoursVal*2)/2;
+      editingId = null;
+      scheduleSave();
+      render();
+    });
+    form.querySelector(".js-cancel").addEventListener("click", function(){
+      editingId = null;
+      render();
+    });
+  }
+
+  function buildSummaryText(){
+    const lines = [];
+    lines.push("Study Desk \u2014 Semester Summary");
+    lines.push("Generated " + new Date().toLocaleDateString());
+    lines.push("");
+    let totalAll = 0;
+    data.courses.forEach(function(c){
+      const total = data.totalSeconds[c.id] || 0;
+      totalAll += total;
+      const count = data.badges[c.id] || 0;
+      const tier = getTier(count);
+      const best = data.bestStreaks[c.id] || 0;
+      lines.push("Course: " + c.name);
+      lines.push("  Weekly goal: " + c.goalHours + "h");
+      lines.push("  Trophies: " + count + (tier ? " (" + tier.label + ")" : ""));
+      lines.push("  Best streak: " + best + (best === 1 ? " week" : " weeks"));
+      lines.push("  Total hours studied: " + formatHM(total));
+      lines.push("");
+    });
+    lines.push("Total hours studied across all courses: " + formatHM(totalAll));
+    return lines.join("\n");
+  }
+
+  function renderSemesterModal(){
+    let totalAll = 0;
+    const rows = data.courses.map(function(c){
+      const total = data.totalSeconds[c.id] || 0;
+      totalAll += total;
+      const count = data.badges[c.id] || 0;
+      const tier = getTier(count);
+      const best = data.bestStreaks[c.id] || 0;
+      return (
+        '<div class="modal-course-row">' +
+          '<div class="modal-course-tier">' + (tier ? tier.emoji : "\u2014") + '</div>' +
+          '<div style="flex:1;">' +
+            '<div class="modal-course-name">' + escapeHtml(c.name) + '</div>' +
+            '<div class="modal-course-stats">' + count + ' trophies \u00b7 best streak ' + best + (best === 1 ? " week" : " weeks") + ' \u00b7 ' + formatHM(total) + ' total</div>' +
+          '</div>' +
+        '</div>'
+      );
+    }).join("");
+
+    return (
+      '<div class="modal-overlay" id="semesterModalOverlay">' +
+        '<div class="modal-panel">' +
+          '<div class="modal-head">' +
+            '<h2>Semester summary</h2>' +
+            '<button class="modal-close" id="modalCloseBtn" aria-label="Close">\u2715</button>' +
+          '</div>' +
+          '<p class="modal-sub">Here is how this semester went across all your courses.</p>' +
+          '<div class="modal-total">' +
+            '<span class="label">Total hours studied</span>' +
+            '<span class="num">' + formatHM(totalAll) + '</span>' +
+          '</div>' +
+          rows +
+          '<div class="modal-actions">' +
+            '<button class="btn-primary" id="copySummaryBtn" style="--tag:' + '#f2a65a' + ';">Copy summary</button>' +
+            '<button class="btn-ghost" id="downloadSummaryBtn">Download .txt</button>' +
+          '</div>' +
+          '<div class="modal-danger-zone">' +
+            '<p>Starting a new semester clears all courses, hours, trophies and streaks so you can set up fresh. This can\'t be undone.</p>' +
+            '<div class="modal-actions" style="margin-top:0;">' +
+              '<button class="btn-ghost" id="keepGoingBtn">Keep going</button>' +
+              '<button class="btn-danger" id="startNewSemesterBtn">Start new semester</button>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>'
+    );
+  }
+
+  function wireSemesterModal(){
+    const overlay = document.getElementById("semesterModalOverlay");
+    if (!overlay) return;
+    overlay.addEventListener("click", function(e){
+      if (e.target === overlay){ semesterModalOpen = false; render(); }
+    });
+    document.getElementById("modalCloseBtn").addEventListener("click", function(){
+      semesterModalOpen = false; render();
+    });
+    document.getElementById("keepGoingBtn").addEventListener("click", function(){
+      semesterModalOpen = false; render();
+    });
+    document.getElementById("copySummaryBtn").addEventListener("click", function(){
+      const text = buildSummaryText();
+      if (navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(text).then(function(){
+          showToast("Summary copied to clipboard.");
+        }).catch(function(){
+          fallbackCopy(text);
+        });
+      } else {
+        fallbackCopy(text);
+      }
+    });
+    document.getElementById("downloadSummaryBtn").addEventListener("click", function(){
+      const text = buildSummaryText();
+      const blob = new Blob([text], { type: "text/plain" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "study-desk-summary.txt";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast("Summary downloaded.");
+    });
+    document.getElementById("startNewSemesterBtn").addEventListener("click", function(){
+      const ok = window.confirm("Start a new semester? This clears all courses, hours, trophies and streaks. This can't be undone.");
+      if (!ok) return;
+      stopTicking();
+      data.courses = [];
+      data.progress = {};
+      data.badges = {};
+      data.streaks = {};
+      data.bestStreaks = {};
+      data.totalSeconds = {};
+      semesterModalOpen = false;
+      scheduleSave();
+      render();
+      showToast("Fresh start! Set up your new semester's courses.");
+    });
+  }
+
+  function fallbackCopy(text){
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    try {
+      document.execCommand("copy");
+      showToast("Summary copied to clipboard.");
+    } catch(e){
+      showToast("Couldn't copy automatically \u2014 try the download option instead.");
+    }
+    document.body.removeChild(ta);
+  }
+
+  function renderOnboarding(){
+    const colors = ["#f2a65a","#6fcf97","#6fa8dc","#d88fd8","#e0654f"];
+    const rows = Array.from({length: 5}).map(function(_, i){
+      return (
+        '<div class="ob-row">' +
+          '<span class="dot" style="background:' + colors[i] + '"></span>' +
+          '<input type="text" class="ob-name" placeholder="Course ' + (i+1) + (i<3 ? "" : " (optional)") + '" maxlength="40">' +
+          '<input type="number" class="ob-hours" placeholder="6" min="0.5" max="80" step="0.5">' +
+          '<span class="unit">hrs/wk</span>' +
+        '</div>'
+      );
+    }).join("");
+
+    appEl.innerHTML =
+      '<div id="onboarding">' +
+        '<h2>Set up your semester</h2>' +
+        '<p class="lead">Add your courses and how many hours a week you want to study each one. You can add more, edit, or delete any time.</p>' +
+        rows +
+        '<button class="submit" id="startSemesterBtn">Start semester</button>' +
+      '</div>';
+
+    document.getElementById("startSemesterBtn").addEventListener("click", function(){
+      const names = Array.from(document.querySelectorAll(".ob-name"));
+      const hours = Array.from(document.querySelectorAll(".ob-hours"));
+      const newCourses = [];
+      names.forEach(function(input, i){
+        const name = input.value.trim();
+        const h = parseFloat(hours[i].value);
+        if (name){
+          newCourses.push({ id: uid(), name: name.slice(0,40), goalHours: (!isNaN(h) && h > 0) ? Math.round(h*2)/2 : 5 });
+        }
+      });
+      if (!newCourses.length){
+        showToast("Add at least one course to get started.");
+        return;
+      }
+      data.courses = newCourses;
+      newCourses.forEach(function(c){ data.progress[c.id] = { seconds: 0 }; });
+      scheduleSave();
+      render();
+    });
+  }
+
+  function addCourse(){
+    const c = { id: uid(), name: "New course", goalHours: 5 };
+    data.courses.push(c);
+    data.progress[c.id] = { seconds: 0 };
+    editingId = c.id;
+    scheduleSave();
+    render();
+  }
+
+  function deleteCourse(id){
+    if (runningId === id) stopTicking();
+    data.courses = data.courses.filter(function(c){ return c.id !== id; });
+    delete data.progress[id];
+    delete data.badges[id];
+    delete data.streaks[id];
+    delete data.bestStreaks[id];
+    delete data.totalSeconds[id];
+    scheduleSave();
+    render();
+  }
+
+  function resetCourse(id){
+    if (runningId === id) stopTicking();
+    data.progress[id] = { seconds: 0 };
+    scheduleSave();
+    render();
+  }
+
+  function resetAll(){
+    stopTicking();
+    data.courses.forEach(function(c){
+      const prog = data.progress[c.id] || { seconds: 0 };
+      const hitGoal = prog.seconds >= goalSeconds(c) && goalSeconds(c) > 0;
+      if (hitGoal){
+        data.streaks[c.id] = (data.streaks[c.id] || 0) + 1;
+        data.bestStreaks[c.id] = Math.max(data.bestStreaks[c.id] || 0, data.streaks[c.id]);
+      } else {
+        data.streaks[c.id] = 0;
+      }
+      data.progress[c.id] = { seconds: 0 };
+    });
+    scheduleSave();
+    render();
+    showToast("New week started. Hours reset, your trophies and streaks stay put.");
+  }
+
+  function toggleTimer(id){
+    if (runningId === id){
+      stopTicking();
+      render();
+      return;
+    }
+    if (runningId){
+      stopTicking();
+    }
+    runningId = id;
+    lastTick = Date.now();
+    if (data.settings.pomodoro){
+      if (pomodoroState.courseId !== id){
+        pomodoroState = { courseId: id, phase: "focus", remaining: data.settings.focusMin * 60, cycles: 0 };
+      }
+    }
+    tickHandle = setInterval(function(){ tick(id); }, 1000);
+    render();
+  }
+
+  function stopTicking(){
+    if (tickHandle) clearInterval(tickHandle);
+    tickHandle = null;
+    runningId = null;
+    scheduleSave();
+  }
+
+  function startPomodoroPhase(phase){
+    pomodoroState.phase = phase;
+    const s = data.settings;
+    const mins = phase === "focus" ? s.focusMin : (phase === "long" ? s.longBreakMin : s.shortBreakMin);
+    pomodoroState.remaining = mins * 60;
+  }
+
+  function advancePomodoroPhase(c){
+    if (pomodoroState.phase === "focus"){
+      pomodoroState.cycles += 1;
+      const isLong = pomodoroState.cycles % data.settings.cyclesBeforeLong === 0;
+      startPomodoroPhase(isLong ? "long" : "short");
+      showToast("Focus session done, " + (isLong ? "long" : "short") + " break time.");
+    } else {
+      startPomodoroPhase("focus");
+      showToast("Break's over, back to focus on " + c.name + ".");
+    }
+    render();
+  }
+
+  function tick(id){
+    const now = Date.now();
+    const delta = (now - lastTick) / 1000;
+    lastTick = now;
+    const c = data.courses.find(function(x){ return x.id === id; });
+    if (!c){ stopTicking(); return; }
+
+    const prog = data.progress[id] || { seconds: 0 };
+    const effGoalSecs = goalSeconds(c);
+    const pomo = data.settings.pomodoro;
+
+    let addToStudy = true;
+    if (pomo && pomodoroState.courseId === id && pomodoroState.phase !== "focus"){
+      addToStudy = false;
+    }
+
+    if (addToStudy){
+      const wasBelowGoal = prog.seconds < effGoalSecs;
+      prog.seconds = Math.min(effGoalSecs, prog.seconds + delta);
+      data.progress[id] = prog;
+      data.totalSeconds[id] = (data.totalSeconds[id] || 0) + delta;
+      if (wasBelowGoal && prog.seconds >= effGoalSecs && effGoalSecs > 0){
+        data.badges[id] = (data.badges[id] || 0) + 1;
+        stopTicking();
+        showToast("\u{1F3C6} Trophy earned, " + c.name + " hit its goal!");
+        scheduleSave();
+        render();
+        return;
+      }
+    }
+
+    if (pomo && pomodoroState.courseId === id){
+      pomodoroState.remaining -= delta;
+      if (pomodoroState.remaining <= 0){
+        advancePomodoroPhase(c);
+        return;
+      }
+    }
+
+    updateCardDOM(c, prog.seconds);
+  }
+
+  function updateCardDOM(c, seconds){
+    const card = document.getElementById("card-"+c.id);
+    if (!card) return;
+    const goalSecs = goalSeconds(c);
+    const remaining = Math.max(0, goalSecs - seconds);
+    const pct = goalSecs > 0 ? Math.min(100, (seconds/goalSecs)*100) : 0;
+    const big = card.querySelector(".timer-big");
+    const sub = card.querySelector(".timer-sub");
+    const fill = card.querySelector(".progress-fill");
+    const phaseTime = card.querySelector(".phase-time");
+    if (big) big.textContent = formatHMS(remaining);
+    if (sub) sub.textContent = formatHM(seconds) + " studied of " + effectiveGoalHours(c) + "h";
+    if (fill) fill.style.width = pct + "%";
+    if (phaseTime && pomodoroState.courseId === c.id) phaseTime.textContent = formatMMSS(pomodoroState.remaining);
+    if (Math.round(seconds) % 10 === 0) scheduleSave();
+  }
+
+  function escapeHtml(str){
+    return String(str).replace(/[&<>"']/g, function(s){
+      return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[s];
+    });
+  }
+  function escapeAttr(str){ return escapeHtml(str); }
+
+  window.addEventListener("beforeunload", function(){ if (runningId) saveData(); });
+
+  (async function init(){
+    data = await loadData();
+    if (!data.courses) data.courses = [];
+    if (!data.progress) data.progress = {};
+    if (!data.badges) data.badges = {};
+    if (!data.settings) data.settings = Object.assign({}, DEFAULT_SETTINGS);
+    if (!data.streaks) data.streaks = {};
+    if (!data.bestStreaks) data.bestStreaks = {};
+    if (!data.totalSeconds) data.totalSeconds = {};
+    expireBoosts();
+    render();
+    const cfg = getSyncConfig();
+    if (cfg.serverUrl && cfg.code) pullSync(true);
+
+    // Periodic auto-push: every 2 minutes, only if something actually changed
+    // and we're not already mid-sync.
+    setInterval(function(){
+      const c = getSyncConfig();
+      if (c.serverUrl && c.code && syncDirty && syncState !== "syncing"){
+        pushSync(true);
+      }
+    }, 120000);
+
+    // Auto-pull whenever the window regains focus, so switching back from
+    // another device picks up its changes automatically.
+    window.addEventListener("focus", function(){
+      const c = getSyncConfig();
+      if (c.serverUrl && c.code && syncState !== "syncing") pullSync(true);
+    });
+
+    // Best-effort push whenever the window loses focus or is about to close.
+    // This is opportunistic, not guaranteed — the periodic push above is the
+    // real safety net for anything this misses.
+    window.addEventListener("blur", function(){
+      const c = getSyncConfig();
+      if (c.serverUrl && c.code && syncDirty && syncState !== "syncing") pushSync(true);
+    });
+    window.addEventListener("beforeunload", function(){
+      const c = getSyncConfig();
+      if (c.serverUrl && c.code && syncDirty) pushSync(true);
+    });
+  })();
+
+  if ("serviceWorker" in navigator){
+    window.addEventListener("load", function(){
+      navigator.serviceWorker.register("service-worker.js").catch(function(e){
+        console.warn("Service worker registration failed", e);
+      });
+    });
+  }
+})();
+</script>
+</body>
+</html>
