@@ -558,6 +558,28 @@
     }
   }
 
+  function adjustManualTime(id, deltaSeconds){
+    const c = data.courses.find(function(x){ return x.id === id; });
+    if (!c) return;
+    const prog = data.progress[id] || { seconds: 0 };
+    const effGoalSecs = goalSeconds(c);
+    const wasBelowGoal = prog.seconds < effGoalSecs;
+
+    prog.seconds = Math.max(0, prog.seconds + deltaSeconds);
+    if (effGoalSecs > 0) prog.seconds = Math.min(effGoalSecs, prog.seconds);
+    data.progress[id] = prog;
+    data.totalSeconds[id] = Math.max(0, (data.totalSeconds[id] || 0) + deltaSeconds);
+
+    if (wasBelowGoal && prog.seconds >= effGoalSecs && effGoalSecs > 0 && deltaSeconds > 0){
+      data.badges[id] = (data.badges[id] || 0) + 1;
+      showToast("\u{1F3C6} Trophy earned, " + c.name + " hit its goal!");
+    } else {
+      showToast((deltaSeconds > 0 ? "Added " : "Removed ") + formatHM(Math.abs(deltaSeconds)) + " for " + c.name + ".");
+    }
+    scheduleSave();
+    render();
+  }
+
   function goalSeconds(c){ return effectiveGoalHours(c) * 3600; }
 
   function getTier(count){
@@ -712,6 +734,20 @@
       if (toggleBtn) toggleBtn.addEventListener("click", function(){ toggleTimer(c.id); });
       const resetBtn = card.querySelector(".js-reset");
       if (resetBtn) resetBtn.addEventListener("click", function(){ resetCourse(c.id); });
+      const manualAddBtn = card.querySelector(".js-manual-add");
+      if (manualAddBtn) manualAddBtn.addEventListener("click", function(){
+        const input = card.querySelector(".js-manual-mins");
+        const mins = parseFloat(input.value);
+        if (!mins || mins <= 0){ showToast("Enter a number of minutes first."); return; }
+        adjustManualTime(c.id, mins * 60);
+      });
+      const manualSubBtn = card.querySelector(".js-manual-sub");
+      if (manualSubBtn) manualSubBtn.addEventListener("click", function(){
+        const input = card.querySelector(".js-manual-mins");
+        const mins = parseFloat(input.value);
+        if (!mins || mins <= 0){ showToast("Enter a number of minutes first."); return; }
+        adjustManualTime(c.id, -mins * 60);
+      });
       const editBtn = card.querySelector(".js-edit");
       if (editBtn) editBtn.addEventListener("click", function(){ editingId = c.id; testFormOpenId = null; render(); });
       const deleteBtn = card.querySelector(".js-delete");
@@ -852,6 +888,11 @@
           '</div>' +
           phaseRowHtml +
           '<div class="progress-track"><div class="progress-fill" style="width:' + pct + '%;"></div></div>' +
+          '<div class="manual-time-row" style="display:flex;gap:6px;align-items:center;margin:8px 0;">' +
+            '<input type="number" class="js-manual-mins" min="1" max="600" value="15" style="width:64px;" title="Minutes">' +
+            '<button class="btn-ghost js-manual-add" type="button" title="Add this many minutes (e.g. a lecture you didn\u2019t time)">+ Add</button>' +
+            '<button class="btn-ghost js-manual-sub" type="button" title="Remove this many minutes">\u2212 Remove</button>' +
+          '</div>' +
           '<div class="card-actions">' +
             '<button class="btn-primary js-toggle' + (isRunning ? " is-running" : "") + '"' + (isDone ? " disabled" : "") + '>' +
               (isRunning ? "Pause" : (isDone ? "Complete" : "Start")) +
