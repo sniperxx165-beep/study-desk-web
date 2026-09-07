@@ -842,9 +842,10 @@
     const tagClass = TAG_CLASSES[i % TAG_CLASSES.length];
     const seconds = (data.progress[c.id] && data.progress[c.id].seconds) || 0;
     const goalSecs = goalSeconds(c);
-    const remaining = Math.max(0, goalSecs - seconds);
+    const overtime = goalSecs > 0 && seconds > goalSecs;
+    const remaining = overtime ? (seconds - goalSecs) : Math.max(0, goalSecs - seconds);
     const isRunning = runningId === c.id;
-    const isDone = remaining <= 0 && goalSecs > 0;
+    const isDone = overtime;
     const pct = goalSecs > 0 ? Math.min(100, (seconds/goalSecs)*100) : 0;
     const trophyCount = data.badges[c.id] || 0;
     const streak = data.streaks[c.id] || 0;
@@ -926,7 +927,7 @@
 
         (testFormOpenId === c.id ? "" :
           '<div class="timer-display">' +
-            '<div class="timer-big">' + (isDone ? "Done!" : formatHMS(remaining)) + '</div>' +
+            '<div class="timer-big">' + (overtime ? "+" : "") + formatHMS(remaining) + '</div>' +
             '<div class="timer-sub">' + formatHM(seconds) + ' studied of ' + effectiveGoalHours(c) + 'h</div>' +
           '</div>' +
           phaseRowHtml +
@@ -937,8 +938,8 @@
             '<button class="btn-ghost js-manual-sub" type="button" title="Remove this many minutes">\u2212 Remove</button>' +
           '</div>' +
           '<div class="card-actions">' +
-            '<button class="btn-primary js-toggle' + (isRunning ? " is-running" : "") + '"' + (isDone ? " disabled" : "") + '>' +
-              (isRunning ? "Pause" : (isDone ? "Complete" : "Start")) +
+            '<button class="btn-primary js-toggle' + (isRunning ? " is-running" : "") + '">' +
+              (isRunning ? "Pause" : (overtime ? "Continue (overtime)" : "Start")) +
             '</button>' +
             '<button class="btn-reset js-reset">Reset</button>' +
           '</div>'
@@ -1260,16 +1261,12 @@
 
     if (addToStudy){
       const wasBelowGoal = prog.seconds < effGoalSecs;
-      prog.seconds = Math.min(effGoalSecs, prog.seconds + delta);
+      prog.seconds = prog.seconds + delta;
       data.progress[id] = prog;
       data.totalSeconds[id] = (data.totalSeconds[id] || 0) + delta;
       if (wasBelowGoal && prog.seconds >= effGoalSecs && effGoalSecs > 0){
         data.badges[id] = (data.badges[id] || 0) + 1;
-        stopTicking();
-        showToast("\u{1F3C6} Trophy earned, " + c.name + " hit its goal!");
-        scheduleSave();
-        render();
-        return;
+        showToast("\u{1F3C6} Trophy earned, " + c.name + " hit its goal! Keep going, extra time still counts.");
       }
     }
 
@@ -1288,14 +1285,15 @@
     const card = document.getElementById("card-"+c.id);
     if (!card) return;
     const goalSecs = goalSeconds(c);
-    const remaining = Math.max(0, goalSecs - seconds);
+    const overtime = goalSecs > 0 && seconds > goalSecs;
+    const remaining = overtime ? (seconds - goalSecs) : Math.max(0, goalSecs - seconds);
     const pct = goalSecs > 0 ? Math.min(100, (seconds/goalSecs)*100) : 0;
     const big = card.querySelector(".timer-big");
     const sub = card.querySelector(".timer-sub");
     const fill = card.querySelector(".progress-fill");
     const phaseTime = card.querySelector(".phase-time");
-    if (big) big.textContent = formatHMS(remaining);
-    if (sub) sub.textContent = formatHM(seconds) + " studied of " + effectiveGoalHours(c) + "h";
+    if (big) big.textContent = (overtime ? "+" : "") + formatHMS(remaining);
+    if (sub) sub.textContent = formatHM(seconds) + " studied of " + effectiveGoalHours(c) + "h" + (overtime ? " \u2014 overtime!" : "");
     if (fill) fill.style.width = pct + "%";
     if (phaseTime && pomodoroState.courseId === c.id) phaseTime.textContent = formatMMSS(pomodoroState.remaining);
     if (Math.round(seconds) % 10 === 0) scheduleSave();
