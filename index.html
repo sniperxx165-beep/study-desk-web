@@ -363,6 +363,7 @@
   let pomodoroState = { courseId: null, phase: null, remaining: 0, cycles: 0 };
   let saveStatus = "idle"; // idle | error
   let semesterModalOpen = false;
+  let welcomeModalOpen = false;
   const SYNC_CONFIG_KEY = "study-desk-sync-config";
   let syncPanelOpen = false;
   let syncState = "idle"; // idle | syncing | error | synced
@@ -580,6 +581,55 @@
     render();
   }
 
+  function renderWelcomeModal(){
+    const cfg = getSyncConfig();
+    return (
+      '<div class="modal-overlay" id="welcomeModalOverlay">' +
+        '<div class="modal-panel">' +
+          '<div class="modal-head">' +
+            '<h2>Welcome to Study Desk</h2>' +
+            '<button class="modal-close" id="welcomeCloseBtn" aria-label="Close">\u2715</button>' +
+          '</div>' +
+          '<p class="modal-sub">Already using Study Desk somewhere else? Connect to that session to pull in your existing courses, instead of starting from scratch.</p>' +
+          '<label class="settings-field">Sync server URL<input type="text" id="welcomeUrlInput" placeholder="https://your-server.example.com" value="' + escapeHtml(cfg.serverUrl || "") + '"></label>' +
+          '<label class="settings-field">Sync code<input type="text" id="welcomeCodeInput" placeholder="e.g. maple-comet-4821" value="' + escapeHtml(cfg.code || "") + '"></label>' +
+          '<p style="font-size:12px;opacity:0.75;min-height:16px;">' + (syncMessage || "") + '</p>' +
+          '<div class="modal-actions">' +
+            '<button class="btn-primary" id="welcomeConnectBtn" style="--tag:#f2a65a;">Connect</button>' +
+            '<button class="btn-ghost" id="welcomeSkipBtn">Start fresh instead</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>'
+    );
+  }
+
+  function wireWelcomeModal(){
+    const overlay = document.getElementById("welcomeModalOverlay");
+    if (!overlay) return;
+    overlay.addEventListener("click", function(e){
+      if (e.target === overlay){ welcomeModalOpen = false; render(); }
+    });
+    document.getElementById("welcomeCloseBtn").addEventListener("click", function(){
+      welcomeModalOpen = false; render();
+    });
+    document.getElementById("welcomeSkipBtn").addEventListener("click", function(){
+      welcomeModalOpen = false; render();
+    });
+    document.getElementById("welcomeConnectBtn").addEventListener("click", async function(){
+      const url = document.getElementById("welcomeUrlInput").value.trim();
+      const code = document.getElementById("welcomeCodeInput").value.trim();
+      if (!url || !code){ showToast("Enter both a server URL and a code."); return; }
+      setSyncConfig({ serverUrl: url, code: code });
+      syncMessage = "Connecting...";
+      render();
+      await pullSync(false);
+      if (data.courses && data.courses.length > 0){
+        welcomeModalOpen = false;
+      }
+      render();
+    });
+  }
+
   function goalSeconds(c){ return effectiveGoalHours(c) * 3600; }
 
   function getTier(count){
@@ -659,7 +709,8 @@
         '<button class="btn-ghost" id="resetWeekBtn">Start a new week (reset all hours)</button>' +
         '<button class="btn-ghost" id="endSemesterBtn" style="margin-left:10px;">End semester</button>' +
       '</footer>' +
-      (semesterModalOpen ? renderSemesterModal() : "");
+      (semesterModalOpen ? renderSemesterModal() : "") +
+      (welcomeModalOpen ? renderWelcomeModal() : "");
 
     document.getElementById("addCourseBtn").addEventListener("click", addCourse);
     document.getElementById("resetWeekBtn").addEventListener("click", resetAll);
@@ -669,6 +720,7 @@
     });
 
     if (semesterModalOpen) wireSemesterModal();
+    if (welcomeModalOpen) wireWelcomeModal();
 
     document.getElementById("pomodoroToggle").addEventListener("change", function(e){
       if (runningId) stopTicking();
@@ -1277,8 +1329,11 @@
     if (!data.bestStreaks) data.bestStreaks = {};
     if (!data.totalSeconds) data.totalSeconds = {};
     expireBoosts();
-    render();
     const cfg = getSyncConfig();
+    if (!cfg.serverUrl && !cfg.code && data.courses.length === 0){
+      welcomeModalOpen = true;
+    }
+    render();
     if (cfg.serverUrl && cfg.code) pullSync(true);
 
     // Periodic auto-push: every 2 minutes, only if something actually changed
